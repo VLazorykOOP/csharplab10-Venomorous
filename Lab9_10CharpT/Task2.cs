@@ -6,109 +6,238 @@ using System.Threading.Tasks;
 
 namespace Lab9_10CharpT
 {
-    public delegate void ConveyorEventHandler(object sender, EventArgs e);
+    public delegate void ConveyorEventHandler(object sender, ConveyorEventArgs e);
+
+    public class ConveyorEventArgs : EventArgs
+    {
+        public string ConveyorName { get; }
+        public double CurrentSpeed { get; }
+        public string Message { get; }
+
+        public ConveyorEventArgs(string conveyorName, double currentSpeed, string message)
+        {
+            ConveyorName = conveyorName;
+            CurrentSpeed = currentSpeed;
+            Message = message;
+        }
+    }
 
     public class Conveyor
     {
-        public event ConveyorEventHandler Start;
-        public event ConveyorEventHandler Stop;
-        public event EventHandler Break;
+        public event ConveyorEventHandler SpeedingUp; // Event for speeding up
+        public event ConveyorEventHandler SlowingDown; // Event for slowing down
 
-        Random random = new Random();
+        private string conveyorName;
+        private double currentSpeed;
+        private Random random;
 
-        public void Run()
+        public Conveyor(string name, double initialSpeed)
         {
-            Console.WriteLine("Conveyor is running.");
-            OnStart(EventArgs.Empty);
+            conveyorName = name;
+            currentSpeed = initialSpeed;
+            random = new Random();
         }
 
-        public void Halt()
+        protected virtual void OnSpeedingUp(ConveyorEventArgs e)
         {
-            Console.WriteLine("Conveyor is stopping.");
-            OnStop(EventArgs.Empty);
+            SpeedingUp?.Invoke(this, e);
         }
 
-        public void BreakDown()
+        protected virtual void OnSlowingDown(ConveyorEventArgs e)
         {
-            Console.WriteLine("Conveyor is broken!");
-            OnBreak(EventArgs.Empty);
+            SlowingDown?.Invoke(this, e);
         }
 
-        // Event invocation methods
-        protected virtual void OnStart(EventArgs e)
+        public void SimulateConveyorChanges()
         {
-            if (random.Next(0, 10) < 8) // 80% chance of firing the event
-                Start?.Invoke(this, e);
-        }
+            for (int i = 0; i < 5; i++)
+            {
+                // Simulate random changes in conveyor speed
+                double percentageChange = (random.NextDouble() - 0.5) * 2; // From -1 to 1
+                currentSpeed *= (1 + percentageChange);
 
-        protected virtual void OnStop(EventArgs e)
-        {
-            if (random.Next(0, 10) < 8) // 80% chance of firing the event
-                Stop?.Invoke(this, e);
-        }
+                // Determine whether the speed is increasing or decreasing
+                if (percentageChange > 0)
+                {
+                    OnSpeedingUp(new ConveyorEventArgs(conveyorName, currentSpeed, "Speeding up!"));
+                }
+                else
+                {
+                    OnSlowingDown(
+                        new ConveyorEventArgs(conveyorName, currentSpeed, "Slowing down!")
+                    );
+                }
 
-        protected virtual void OnBreak(EventArgs e)
-        {
-            if (random.Next(0, 10) < 0) // 30% chance of firing the event
-                Break?.Invoke(this, e);
+                System.Threading.Thread.Sleep(1000); // Delay for visualization
+            }
         }
     }
 
-    public class Logger
+    public interface IConveyorOperator
     {
-        public void LogStart(object sender, EventArgs e)
+        void Subscribe(Conveyor conveyor);
+        void Unsubscribe(Conveyor conveyor);
+
+        void HandleConveyorEvent(object sender, ConveyorEventArgs e);
+    }
+
+    public class Flash : IConveyorOperator
+    {
+        public void Subscribe(Conveyor conveyor)
         {
-            Console.WriteLine("Logger: Conveyor started.");
+            conveyor.SpeedingUp += HandleConveyorEvent;
         }
 
-        public void LogStop(object sender, EventArgs e)
+        public void Unsubscribe(Conveyor conveyor)
         {
-            Console.WriteLine("Logger: Conveyor stopped.");
+            conveyor.SpeedingUp -= HandleConveyorEvent;
         }
 
-        public void LogBreak(object sender, EventArgs e)
+        public void HandleConveyorEvent(object sender, ConveyorEventArgs e)
         {
-            Console.WriteLine("Logger: Conveyor broken!");
+            Console.WriteLine($"The Flash: {e.ConveyorName}, Speed: {e.CurrentSpeed}, {e.Message}");
         }
     }
 
-    class ProgramTask2
+    public class Slowpoke : IConveyorOperator
+    {
+        public void Subscribe(Conveyor conveyor)
+        {
+            conveyor.SlowingDown += HandleConveyorEvent;
+        }
+
+        public void Unsubscribe(Conveyor conveyor)
+        {
+            conveyor.SlowingDown -= HandleConveyorEvent;
+        }
+
+        public void HandleConveyorEvent(object sender, ConveyorEventArgs e)
+        {
+            Console.WriteLine($"Slowpoke: {e.ConveyorName}, Speed: {e.CurrentSpeed}, {e.Message}");
+        }
+    }
+
+    public class ProgramTask2
     {
         public static void Task()
         {
-            //Conveyor conveyor = new Conveyor();
-            //Logger logger = new Logger();
+            Conveyor conveyor = new Conveyor("Assembly Line", 10.0);
+            Flash flash = new Flash();
+            Slowpoke slowpoke = new Slowpoke();
 
-            //// Subscribe to events
-            //conveyor.Start += logger.LogStart;
-            //conveyor.Stop += logger.LogStop;
+            flash.Subscribe(conveyor);
+            slowpoke.Subscribe(conveyor);
 
-            //// Simulate conveyor operation
-            //conveyor.Run();
-            //Console.WriteLine("Working on the conveyor...");
-            //conveyor.Halt();
+            conveyor.SimulateConveyorChanges();
 
-            Conveyor conveyor = new Conveyor();
-            Logger logger = new Logger();
-
-            // Subscribe to events
-            conveyor.Start += logger.LogStart;
-            conveyor.Stop += logger.LogStop;
-            conveyor.Break += logger.LogBreak;
-
-            // Simulate conveyor operation
-            Console.WriteLine("Press any key to start the conveyor...");
-            Console.ReadKey();
-            conveyor.Run();
-
-            Console.WriteLine("Working on the conveyor... Press any key to break it.");
-            Console.ReadKey();
-            conveyor.BreakDown();
-
-            conveyor.Halt();
-
-            Console.WriteLine("Press any key to exit.");
-            Console.ReadKey();
+            flash.Unsubscribe(conveyor);
+            slowpoke.Unsubscribe(conveyor);
         }
     }
+
+    //public delegate void ConveyorEventHandler(object sender, EventArgs e);
+
+    //public class Conveyor
+    //{
+    //    public event ConveyorEventHandler Start;
+    //    public event ConveyorEventHandler Stop;
+    //    public event EventHandler Break;
+
+    //    Random random = new Random();
+
+    //    public void Run()
+    //    {
+    //        Console.WriteLine("Conveyor is running.");
+    //        OnStart(EventArgs.Empty);
+    //    }
+
+    //    public void Halt()
+    //    {
+    //        Console.WriteLine("Conveyor is stopping.");
+    //        OnStop(EventArgs.Empty);
+    //    }
+
+    //    public void BreakDown()
+    //    {
+    //        Console.WriteLine("Conveyor is broken!");
+    //        OnBreak(EventArgs.Empty);
+    //    }
+
+    //    // Event invocation methods
+    //    protected virtual void OnStart(EventArgs e)
+    //    {
+    //        if (random.Next(0, 10) < 8) // 80% chance of firing the event
+    //            Start?.Invoke(this, e);
+    //    }
+
+    //    protected virtual void OnStop(EventArgs e)
+    //    {
+    //        if (random.Next(0, 10) < 8) // 80% chance of firing the event
+    //            Stop?.Invoke(this, e);
+    //    }
+
+    //    protected virtual void OnBreak(EventArgs e)
+    //    {
+    //        if (random.Next(0, 10) < 0) // 30% chance of firing the event
+    //            Break?.Invoke(this, e);
+    //    }
+    //}
+
+    //public class Logger
+    //{
+    //    public void LogStart(object sender, EventArgs e)
+    //    {
+    //        Console.WriteLine("Logger: Conveyor started.");
+    //    }
+
+    //    public void LogStop(object sender, EventArgs e)
+    //    {
+    //        Console.WriteLine("Logger: Conveyor stopped.");
+    //    }
+
+    //    public void LogBreak(object sender, EventArgs e)
+    //    {
+    //        Console.WriteLine("Logger: Conveyor broken!");
+    //    }
+    //}
+
+    //class ProgramTask2
+    //{
+    //    public static void Task()
+    //    {
+    //        //Conveyor conveyor = new Conveyor();
+    //        //Logger logger = new Logger();
+
+    //        //// Subscribe to events
+    //        //conveyor.Start += logger.LogStart;
+    //        //conveyor.Stop += logger.LogStop;
+
+    //        //// Simulate conveyor operation
+    //        //conveyor.Run();
+    //        //Console.WriteLine("Working on the conveyor...");
+    //        //conveyor.Halt();
+
+    //        Conveyor conveyor = new Conveyor();
+    //        Logger logger = new Logger();
+
+    //        // Subscribe to events
+    //        conveyor.Start += logger.LogStart;
+    //        conveyor.Stop += logger.LogStop;
+    //        conveyor.Break += logger.LogBreak;
+
+    //        // Simulate conveyor operation
+    //        Console.WriteLine("Press any key to start the conveyor...");
+    //        Console.ReadKey();
+    //        conveyor.Run();
+
+    //        Console.WriteLine("Working on the conveyor... Press any key to break it.");
+    //        Console.ReadKey();
+    //        conveyor.BreakDown();
+
+    //        conveyor.Halt();
+
+    //        Console.WriteLine("Press any key to exit.");
+    //        Console.ReadKey();
+    //    }
+    //}
 }
